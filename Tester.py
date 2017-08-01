@@ -13,37 +13,43 @@ WEB_DRIVER_PATH = "./chromedriver.exe"
 TARGET_URL = "http://resumize.me/"
 MAIL = "https://www.mailinator.com/v2/inbox.jsp?zone=public&query="
 driver = webdriver.Chrome(executable_path=WEB_DRIVER_PATH)
+CREDENTIALS = "./credentials.txt"
 #pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files (x86)\\Tesseract-OCR\\tesseract'
 
 TESTS = 100
 
-def verify_email(email):
+
+def verify_email(email, attempt=3):
     driver.execute_script("window.open('');")
     driver.switch_to.window(driver.window_handles[1])
     driver.get(MAIL + email)
     rest()
 
     found = [div for div in driver.find_elements_by_tag_name("div") if "resumize.me" in div.text.lower()]
-    while not found:
-        driver.refresh()
-        rest()
-        found = [div for div in driver.find_elements_by_tag_name("div") if "resumize.me" in div.text.lower()]
 
-    found[0].click()
-    rest()
-    body = driver.find_element_by_id("msgpane")
-    if body:
-        driver.switch_to.frame(driver.find_element_by_id("msg_body"))
-        content = driver.find_element_by_tag_name("html")
-        link = content.text.split("http://")[1].strip()
-        driver.get("http://" + link)
+    i = 0
+    while not found and i <= attempt:
+        driver.refresh()
+        time.sleep(60)
+        found = [div for div in driver.find_elements_by_tag_name("div") if "resumize.me" in div.text.lower()]
+        i += 1
+
+    if found:
+        found[0].click()
         rest()
-        driver.close()
-        ## try to automatically recognize the text in the image
-        # print "ah-ah"
-        # driver.get_screenshot_as_file('./mailinator.png')
-        # img = Image.open('./mailinator.png')
-        # text = pytesseract.image_to_string(img, lang="eng")
+        body = driver.find_element_by_id("msgpane")
+        if body:
+            driver.switch_to.frame(driver.find_element_by_id("msg_body"))
+            content = driver.find_element_by_tag_name("html")
+            link = content.text.split("http://")[1].strip()
+            driver.get("http://" + link)
+            rest()
+            driver.close()
+            ## try to automatically recognize the text in the image
+            # print "ah-ah"
+            # driver.get_screenshot_as_file('./mailinator.png')
+            # img = Image.open('./mailinator.png')
+            # text = pytesseract.image_to_string(img, lang="eng")
 
     driver.switch_to.window(driver.window_handles[0])
 
@@ -52,31 +58,45 @@ def register_new_account():
     rest()
     #find create account button
     found = [a for a in driver.find_elements_by_tag_name("a") if "create an account" in a.text.lower()]
-    if found:
-        found[0].click()
-        #generate fake credentials
-        name = loremipsum.generate_sentence()[2][:20].strip()
-        email = hashlib.sha224(name).hexdigest()[:64] + "@mailinator.com"
-        pwd = loremipsum.generate_sentence()[2][:10].strip()
+    while not found:
+        rest()
+        found = [a for a in driver.find_elements_by_tag_name("a") if "create an account" in a.text.lower()]
 
-        print "name: " + name + " -- email: " + email + " -- pwd: " + pwd
+    found[0].click()
+    #generate fake credentials
+    name = loremipsum.generate_sentence()[2][:20].strip()
+    email = hashlib.sha224(name).hexdigest()[:64] + "@mailinator.com"
+    pwd = loremipsum.generate_sentence()[2][:10].strip()
 
-        #send them to the corresponding fields
+    credentials = "name: " + name + " -- email: " + email + " -- pwd: " + pwd
+    with open(CREDENTIALS, "a+") as f:
+        f.write(credentials + "\n")
+    print credentials
+
+    #send them to the corresponding fields
+    inputs = driver.find_elements_by_tag_name("input")
+    while not inputs:
+        rest()
         inputs = driver.find_elements_by_tag_name("input")
-        inputs[0].send_keys(name)
-        inputs[1].send_keys(email)
-        inputs[2].send_keys(pwd)
 
-        #register
-        click_button("sign")
-        verify_email(email)
+    inputs[0].send_keys(name)
+    inputs[1].send_keys(email)
+    inputs[2].send_keys(pwd)
+
+    #register
+    click_button("sign")
+    return email
 
 
 def click_button(name, pos=0):
     found = [b for b in driver.find_elements_by_tag_name("button") if name in b.text.lower()]
-    if found:
-        found[pos].click()
+
+    while not found:
         rest()
+        found = [b for b in driver.find_elements_by_tag_name("button") if name in b.text.lower()]
+
+    found[pos].click()
+    rest()
 
 
 def rest():
@@ -84,15 +104,29 @@ def rest():
 
 
 def professional_area():
+    rest()
     form = driver.find_element_by_tag_name("form")
+    while not form:
+        rest()
+        form = driver.find_element_by_tag_name("form")
+
     areas = form.find_elements_by_tag_name("div")
+    while not areas:
+        rest()
+        areas = form.find_elements_by_tag_name("div")
+
     selection = areas[random.randint(0, len(areas)-1)]
     selection.click()
     click_button("save professional")
 
 
 def personal_info():
+    rest()
     inputs = driver.find_elements_by_tag_name("input")
+    while not inputs:
+        rest()
+        inputs = driver.find_elements_by_tag_name("input")
+
     job_title = loremipsum.generate_sentence()[2][:10].strip()
     headline = loremipsum.generate_sentence()[2][:15].strip()
     phone = "".join(([str(abs(ord(t) - 96)) for t in loremipsum.generate_sentence()[2][:10].strip()]))[:10]
@@ -109,10 +143,14 @@ def personal_info():
 
 
 def languages():
+    rest()
     click_button("new language")
 
-    rest()
     forms = [f for f in driver.find_elements_by_class_name("form-group") if "spoken" in f.text.lower() or "written" in f.text.lower() or "reading" in f.text.lower()]
+    while not forms:
+        rest()
+        forms = [f for f in driver.find_elements_by_class_name("form-group") if "spoken" in f.text.lower() or "written" in f.text.lower() or "reading" in f.text.lower()]
+
     for f in forms:
         selected = f.find_elements_by_tag_name("div")[random.randint(0, 4)]
         selected.click()
@@ -124,9 +162,13 @@ def languages():
 
 
 def education():
+    rest()
     click_button("new education")
 
     inputs = [i for i in driver.find_elements_by_tag_name("input")]
+    while not inputs:
+        rest()
+        inputs = [i for i in driver.find_elements_by_tag_name("input")]
 
     institute = loremipsum.generate_sentence()[2][:15].strip()
     course = loremipsum.generate_sentence()[2][:15].strip()
@@ -144,8 +186,13 @@ def education():
 
 
 def certification():
+    rest()
     click_button("new certification")
+
     inputs = [i for i in driver.find_elements_by_tag_name("input")]
+    while not inputs:
+        rest()
+        inputs = [i for i in driver.find_elements_by_tag_name("input")]
 
     title = loremipsum.generate_sentence()[2][:15].strip()
     authority = loremipsum.generate_sentence()[2][:15].strip()
@@ -174,30 +221,53 @@ def certification():
 
 
 def professional_experience():
+    rest()
     click_button("next")
 
 
 def color_schema():
+    rest()
     options = driver.find_elements_by_class_name("color-scheme-name")
+    while not options:
+        rest()
+        options = driver.find_elements_by_class_name("color-scheme-name")
+
     options[random.randint(0, len(options)-1)].click()
+
+
+def download():
+    rest()
+    resent = False
     click_button("download")
 
+    rest()
+    again = [b for b in driver.find_elements_by_tag_name("button") if "email again" in b.text.lower()]
+    if again:
+        again.click()
+        rest()
+        cancel = [b for b in driver.find_elements_by_tag_name("button") if "cancel" in b.text.lower()]
+        cancel.click()
+        resent = True
 
-def filling_data():
+    return resent
+
+
+def wait_download():
+    finished = [b for b in driver.find_elements_by_tag_name("button") if "color scheme" in b.text.lower()]
+    while not finished:
+        rest()
+        finished = [b for b in driver.find_elements_by_tag_name("button") if "color scheme" in b.text.lower()]
+
     rest()
-    professional_area()
+
+
+def logout():
     rest()
-    personal_info()
-    rest()
-    languages()
-    rest()
-    education()
-    rest()
-    certification()
-    rest()
-    professional_experience()
-    rest()
-    color_schema()
+    found = [a for a in driver.find_elements_by_tag_name("a") if "logout" in a.text.lower()]
+    while not found:
+        found = [a for a in driver.find_elements_by_tag_name("a") if "logout" in a.text.lower()]
+
+    found[0].click()
 
 
 def main():
@@ -205,8 +275,20 @@ def main():
 
     for i in range(0, TESTS):
         driver.get(TARGET_URL)
-        register_new_account()
-        filling_data()
+        email = register_new_account()
+        professional_area()
+        personal_info()
+        languages()
+        education()
+        certification()
+        professional_experience()
+        verify_email(email)
+        color_schema()
+        resent = download()
+        if resent:
+            verify_email(email)
+        wait_download()
+        logout()
 
     driver.close()
 
