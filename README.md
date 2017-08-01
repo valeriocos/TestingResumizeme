@@ -17,7 +17,8 @@ $> python Tester.py
 ```
 
 A Chrome browser will open and start creating fake CVs.
-By default the script will try create 100 CVs. To change this number, modify the variable TESTS in the script.
+By default the script will try to create 100 CVs. To change this number, modify the variable TESTS in the script.
+The fake user credentials are prompted and saved to credentials.txt
 
 Final note, Selenium may be blocked by some antivirus when trying to connect to Internet.
 
